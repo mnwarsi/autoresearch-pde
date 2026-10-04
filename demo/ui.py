@@ -6,53 +6,73 @@ import re
 
 import streamlit as st
 
+ACCENT, GOOD, WARN = "#2a78d6", "#15803d", "#b45309"
 VERDICT = {  # status -> (colour, label)
-    "CONFIDENT": ("#16a34a", "✓ CONFIDENT"),
-    "CONFIDENT IN PREDICTIONS": ("#0891b2", "✓ CONFIDENT IN PREDICTIONS"),
-    "COLLECT MORE DATA": ("#d97706", "◐ COLLECT MORE DATA"),
-    "INCONCLUSIVE": ("#dc2626", "? INCONCLUSIVE"),
-    "VALIDATED": ("#16a34a", "✓ FORECASTS UNSEEN DATA"),
-    "PENDING": ("#64748b", "… RESULTS PENDING"),
-    "NOT RECOVERED": ("#dc2626", "✗ NOT RECOVERED"),
-    "RESULT": ("#475569", "RESULT"),
+    "CONFIDENT": ("#15803d", "Confident"),
+    "CONFIDENT IN PREDICTIONS": ("#0e7490", "Confident in predictions"),
+    "COLLECT MORE DATA": ("#b45309", "Collect more data"),
+    "INCONCLUSIVE": ("#b91c1c", "Inconclusive"),
+    "VALIDATED": ("#15803d", "Forecasts unseen data"),
+    "PENDING": ("#64748b", "Results pending"),
+    "NOT RECOVERED": ("#b91c1c", "Not recovered"),
+    "RESULT": ("#475569", "Result"),
 }
 
 CSS = """
 <style>
-.block-container {padding-top: 3.2rem; padding-bottom: 2rem; max-width: 1380px;}
-h1, h2, h3 {letter-spacing: -0.01em;}
-.q {font-size: 1.45rem; font-weight: 750; line-height: 1.25; margin: 0 0 .7rem 0;}
-.hero-title {font-size: 2.6rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; margin: .2rem 0 .3rem 0;}
-.hero-sub {font-size: 1.15rem; opacity: .72; margin: 0 0 1.2rem 0;}
-.sec {display:flex; align-items:baseline; gap:.6rem; margin: 2.0rem 0 .7rem 0; padding-top: .9rem;
-      border-top: 1px solid rgba(128,128,128,.25);}
-.sec-n {font-size: 1.0rem; font-weight: 800; color: #fff; background: #6366f1; border-radius: 999px;
-        width: 1.7rem; height: 1.7rem; display:inline-flex; align-items:center; justify-content:center; flex: none;}
-.sec-t {font-size: 1.5rem; font-weight: 750; letter-spacing: -0.01em;}
-.sec-s {font-size: .95rem; opacity: .65;}
-.lbl {font-size: 1.02rem; font-weight: 700; margin: .2rem 0 .3rem 0;}
-.verdict-big {border-radius: 14px; padding: 16px 18px; color: #fff; font-weight: 800; font-size: 1.45rem;
-              line-height: 1.2;}
-.check {display:flex; gap:.6rem; align-items:flex-start; margin: .55rem 0;}
-.check .ic {font-size: 1.25rem; line-height: 1.2;}
-.check .t {font-weight: 700; font-size: 1.0rem;}
-.check .d {font-size: .85rem; opacity: .7;}
-.next {border-radius: 14px; padding: 14px 16px; border: 1px solid rgba(99,102,241,.45); background: rgba(99,102,241,.08);}
-.next .h {font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; opacity: .7; margin-bottom: .3rem;}
-.next .w {font-size: 1.12rem; font-weight: 750; line-height: 1.3;}
-.vchip {display:inline-block; padding: 5px 14px; border-radius: 999px; color: #fff; font-weight: 800;
-        font-size: .86rem; letter-spacing: .03em; margin-bottom: .25rem;}
-.chips {display:flex; flex-wrap: wrap; gap: 6px; margin-top: .35rem;}
-.chip {padding: 3px 10px; border-radius: 999px; font-size: .76rem; border: 1px solid rgba(99,102,241,.35);
-       background: rgba(99,102,241,.08); white-space: nowrap;}
-.chip b {color: #6366f1;}
-.protocol {border-radius: 12px; padding: 10px 16px; margin: .4rem 0 1rem 0; font-size: .95rem;
-           border: 1px solid rgba(22,163,74,.35); background: rgba(22,163,74,.08);}
-.card-num {font-size: 1.55rem; font-weight: 800; line-height: 1.2;}
-.card-sub {font-size: .85rem; opacity: .75;}
-.card-name {font-size: 1.05rem; font-weight: 750; margin-top: .3rem;}
-.small {font-size: .8rem; opacity: .75;}
-div[data-testid="stMetricValue"] {font-size: 1.6rem;}
+:root {--accent: #2a78d6; --muted: #6b6f76; --line: #e5e5e1; --card: #ffffff; --soft: #f3f3f1;}
+.block-container {padding-top: 2.6rem; padding-bottom: 4rem; max-width: 1240px;}
+h1, h2, h3 {letter-spacing: -0.015em;}
+.eyebrow {font-size: .72rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--accent);
+          margin: 0 0 .5rem 0;}
+.q {font-family: "Source Serif 4", serif; font-size: 2.1rem; font-weight: 600; letter-spacing: -0.015em;
+    line-height: 1.15; margin: .4rem 0 1.2rem 0;}
+.hero-title {font-family: "Source Serif 4", serif; font-size: 2.7rem; font-weight: 600; letter-spacing: -0.02em;
+             line-height: 1.1; margin: 0 0 .5rem 0;}
+.hero-sub {font-size: 1.08rem; color: var(--muted); line-height: 1.5; max-width: 46rem; margin: 0 0 1.6rem 0;}
+.sec {display:flex; align-items:baseline; gap:.75rem; margin: 2.6rem 0 1rem 0; padding-top: 1.1rem;
+      border-top: 1px solid var(--line);}
+.sec-n {font-family: "JetBrains Mono", monospace; font-size: .78rem; color: var(--accent); flex: none;}
+.sec-t {font-family: "Source Serif 4", serif; font-size: 1.5rem; font-weight: 600; letter-spacing: -0.01em;}
+.sec-s {font-size: .92rem; color: var(--muted);}
+.lbl {font-size: .95rem; font-weight: 600; margin: .2rem 0 .4rem 0;}
+.verdict-big {border-radius: 12px; padding: 14px 16px; font-weight: 600; font-size: 1.2rem; line-height: 1.25;
+              border-left: 4px solid currentColor;}
+.check {display:flex; gap:.7rem; align-items:flex-start; margin: .7rem 0;}
+.check .ic {flex: none; width: 1.25rem; height: 1.25rem; border-radius: 999px; color: #fff; font-size: .75rem;
+            font-weight: 700; display:inline-flex; align-items:center; justify-content:center; margin-top: .1rem;}
+.check .t {font-weight: 600; font-size: .95rem;}
+.check .d {font-size: .84rem; color: var(--muted);}
+.next {border-radius: 12px; padding: 14px 16px; border: 1px solid var(--line); background: var(--card);}
+.next .h {font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; color: var(--accent);
+          margin-bottom: .35rem;}
+.next .w {font-size: 1.05rem; font-weight: 600; line-height: 1.35;}
+.vchip {display:inline-flex; align-items:center; gap:.45rem; padding: 4px 12px 4px 10px; border-radius: 999px;
+        font-weight: 600; font-size: .8rem; margin-bottom: .4rem;}
+.vchip::before {content:""; width:.5rem; height:.5rem; border-radius:999px; background: currentColor;}
+.chips {display:flex; flex-wrap: wrap; gap: 6px; margin-top: .4rem;}
+.chip {padding: 3px 10px; border-radius: 999px; font-size: .76rem; background: var(--soft); color: #3a3d42;
+       white-space: nowrap;}
+.chip b {color: var(--accent); font-weight: 600;}
+.protocol {border-radius: 12px; padding: 12px 18px; margin: .4rem 0 1.4rem 0; font-size: .93rem; line-height: 1.55;
+           color: #3a3d42; background: var(--soft); border-left: 3px solid var(--accent);}
+.tiles {display:grid; gap: 10px; margin: .6rem 0 .8rem 0;}
+.tile {border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--card);}
+.tile .l {font-size: .78rem; color: var(--muted);}
+.tile .v {font-size: 1.55rem; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+          line-height: 1.25; margin-top: .15rem;}
+.tile .s {font-size: .78rem; color: var(--muted); margin-top: .1rem;}
+.tile.hi .v {color: var(--accent);}
+.card-num {font-size: 1.7rem; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2;
+           font-variant-numeric: tabular-nums; margin: .35rem 0 .1rem 0;}
+.card-num span {color: var(--muted); font-weight: 400; font-size: 1rem;}
+.card-sub {font-size: .85rem; color: var(--muted); line-height: 1.45; min-height: 2.6em;}
+.card-name {font-family: "Source Serif 4", serif; font-size: 1.3rem; font-weight: 600; margin-top: .5rem;}
+.card-tag {font-size: .68rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+           margin-top: .7rem;}
+.small {font-size: .82rem; color: var(--muted); line-height: 1.5;}
+div[data-testid="stCaptionContainer"] {line-height: 1.5;}
+div[data-testid="stImage"] img, div[data-testid="stVideo"] video {border-radius: 10px;}
 </style>
 """
 
@@ -61,13 +81,14 @@ def inject_css():
     st.html(CSS)
 
 
-def header(title, sub):
-    st.markdown(f"<div class='hero-title'>{html.escape(title)}</div><div class='hero-sub'>{html.escape(sub)}</div>",
+def header(title, sub, eyebrow=None):
+    st.markdown((f"<div class='eyebrow'>{html.escape(eyebrow)}</div>" if eyebrow else "")
+                + f"<div class='hero-title'>{html.escape(title)}</div><div class='hero-sub'>{html.escape(sub)}</div>",
                 unsafe_allow_html=True)
 
 
 def section(n, title, sub=None):
-    st.markdown(f"<div class='sec'><span class='sec-n'>{n}</span><span class='sec-t'>{html.escape(title)}</span>"
+    st.markdown(f"<div class='sec'><span class='sec-n'>{n:02d}</span><span class='sec-t'>{html.escape(title)}</span>"
                 + (f"<span class='sec-s'>{html.escape(sub)}</span>" if sub else "") + "</div>", unsafe_allow_html=True)
 
 
@@ -82,7 +103,7 @@ def question(text):
 def verdict_chip(status, note=None):
     status = (status or "RESULT").upper()
     color, label = VERDICT.get(status, VERDICT["RESULT"])
-    st.markdown(f"<span class='vchip' style='background:{color}'>{label}</span>"
+    st.markdown(f"<span class='vchip' style='color:{color}; background:{color}14'>{label}</span>"
                 + (f" <span class='small'>{html.escape(note)}</span>" if note else ""), unsafe_allow_html=True)
 
 
@@ -99,12 +120,16 @@ def chips(items, title="how it was found"):
 
 
 def tiles(items, cols=2):
-    """items: list of dict(label, value, delta=None, help=None)."""
-    rows = [items[i:i + cols] for i in range(0, len(items), cols)]
-    for row in rows:
-        cs = st.columns(cols)
-        for c, it in zip(cs, row):
-            c.metric(it["label"], it["value"], it.get("delta"), delta_color="off", help=it.get("help"), border=True)
+    """items: list of dict(label, value, delta=None, help=None, hi=False). `delta` is a plain caption, not a change;
+    `hi` marks the agent's own number in the accent colour."""
+    cells = []
+    for it in items:
+        tip = f" title='{html.escape(it['help'], quote=True)}'" if it.get("help") else ""
+        sub = f"<div class='s'>{html.escape(str(it['delta']))}</div>" if it.get("delta") else ""
+        cells.append(f"<div class='tile{' hi' if it.get('hi') else ''}'{tip}><div class='l'>{html.escape(it['label'])}"
+                     f"</div><div class='v'>{html.escape(str(it['value']))}</div>{sub}</div>")
+    st.markdown(f"<div class='tiles' style='grid-template-columns: repeat({cols}, minmax(0, 1fr))'>{''.join(cells)}"
+                "</div>", unsafe_allow_html=True)
 
 
 # ----------------------------------------------------------------------------- equations
@@ -201,11 +226,11 @@ def experiments(assessment, top=3):
 
 # ----------------------------------------------------------------------------- confidence + next data
 PLAIN_VERDICT = {
-    "CONFIDENT": ("#16a34a", "✓ Very likely the law", "Every check passed."),
-    "CONFIDENT IN PREDICTIONS": ("#0891b2", "✓ Predictions trustworthy", "Rival forms fit equally well, but they all "
+    "CONFIDENT": ("#15803d", "Very likely the law", "Every check passed."),
+    "CONFIDENT IN PREDICTIONS": ("#0e7490", "Predictions trustworthy", "Rival forms fit equally well, but they all "
                                  "predict the same behaviour over the data range."),
-    "COLLECT MORE DATA": ("#d97706", "◐ Not sure yet: collect more data", "The best model so far is not confirmed."),
-    "INCONCLUSIVE": ("#dc2626", "✗ Not established", "The data do not pin down a law."),
+    "COLLECT MORE DATA": ("#b45309", "Not sure yet: collect more data", "The best model so far is not confirmed."),
+    "INCONCLUSIVE": ("#b91c1c", "Not established", "The data do not pin down a law."),
 }
 
 
@@ -248,10 +273,10 @@ def confidence_panel(a, key, names=None):
     color, label, sub = PLAIN_VERDICT.get(v.get("status"), PLAIN_VERDICT["INCONCLUSIVE"])
     c1, c2, c3 = st.columns([1.05, 1, 1], gap="large")
     with c1:
-        st.markdown(f"<div class='verdict-big' style='background:{color}'>{html.escape(label)}</div>"
+        st.markdown(f"<div class='verdict-big' style='color:{color}; background:{color}12'>{html.escape(label)}</div>"
                     f"<div class='small' style='margin:8px 0 6px'>{html.escape(sub)}</div>", unsafe_allow_html=True)
         for name, ok, detail in _checks(a):
-            st.markdown(f"<div class='check'><span class='ic'>{'✅' if ok else '⚠️'}</span><div>"
+            st.markdown(f"<div class='check'><span class='ic' style='background:{GOOD if ok else WARN}'>{'✓' if ok else '!'}</span><div>"
                         f"<div class='t'>{html.escape(name)}</div><div class='d'>{html.escape(detail)}</div></div></div>",
                         unsafe_allow_html=True)
     with c2:
@@ -265,8 +290,8 @@ def confidence_panel(a, key, names=None):
             fig = go.Figure(go.Bar(x=pct, y=lab, orientation="h", marker_color=col,
                                    text=[f"±{p:.2g}%" for p in pct], textposition="outside",
                                    hovertemplate="%{y}: ±%{x:.3g}%<extra></extra>"))
-            fig.update_layout(height=60 + 34 * len(terms), margin=dict(l=10, r=40, t=30, b=10),
-                              title=dict(text="How precisely each number is known (± at 90%)", font=dict(size=15)),
+            st.markdown("<div class='lbl'>Precision of each coefficient (±, 90%)</div>", unsafe_allow_html=True)
+            fig.update_layout(height=40 + 34 * len(terms), margin=dict(l=10, r=40, t=4, b=10),
                               xaxis=dict(type="log", title=None, tickvals=_decades(pct), ticktext=[f"{v:g}%" for v in _decades(pct)],
                                          range=[np.log10(_decades(pct)[0]), np.log10(_decades(pct)[-1]) + 0.3],
                                          tickangle=0),
@@ -283,10 +308,10 @@ def confidence_panel(a, key, names=None):
             why = (f"{g0['info_gain_vs_existing']:.2g}× more informative about "
                    f"{names.get(g0['coefficient'].split(' in ')[0], g0['coefficient'])} than more of the same data"
                    if g0 else "")
-            st.markdown(f"<div class='next'><div class='h'>📍 Measure next</div><div class='w'>{html.escape(str(what))}</div>"
+            st.markdown(f"<div class='next'><div class='h'>Measure next</div><div class='w'>{html.escape(str(what))}</div>"
                         + (f"<div class='small' style='margin-top:.4rem'>{html.escape(why)}</div>" if why else "")
                         + "</div>", unsafe_allow_html=True)
         for adv in (a.get("data_advice") or [])[:1]:
-            st.markdown(f"<div class='small' style='margin-top:8px'>💡 {html.escape(adv)}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='small' style='margin-top:8px'>{html.escape(adv)}</div>", unsafe_allow_html=True)
         if v.get("recommendation") and not ex:
             st.markdown(f"<div class='small'>{html.escape(v['recommendation'])}</div>", unsafe_allow_html=True)

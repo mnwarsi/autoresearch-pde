@@ -22,16 +22,17 @@ PRINCIPLE = ("A correct equation has the same coefficients on every slice of the
 
 CSS = """
 <style>
-.ev-card-t {font-size: 1.02rem; font-weight: 750; margin: 0 0 .1rem 0;}
+.ev-card-t {font-size: 1rem; font-weight: 600; margin: 0 0 .1rem 0;}
 .ev-card-s {font-size: .78rem; opacity: .7; margin-bottom: .35rem; min-height: 2.1em;}
 .ev-said {font-size: .86rem; line-height: 1.3; margin: .35rem 0 .3rem 0; min-height: 3.4em;}
-.ev-chip {display:inline-block; padding: 2px 9px; border-radius: 999px; color: #fff; font-weight: 750;
-          font-size: .7rem; letter-spacing: .03em; margin: 0 4px 3px 0;}
+.ev-chip {display:inline-block; padding: 2px 9px; border-radius: 999px; font-weight: 600;
+          font-size: .7rem; letter-spacing: .04em; margin: 0 4px 3px 0;}
 .ev-quiet {font-size: .72rem; opacity: .6; font-style: italic;}
-.ev-principle {font-size: 1.25rem; font-weight: 650; border-left: 4px solid #6366f1; padding: .3rem 0 .3rem .9rem;
+.ev-principle {font-family: 'Source Serif 4', serif; font-size: 1.4rem; font-weight: 500; font-style: italic;
+               border-left: 3px solid #2a78d6; padding: .3rem 0 .3rem .9rem;
                margin: .2rem 0 1rem 0;}
-.ev-model {font-size: 1.1rem; font-weight: 750; margin-bottom: .2rem;}
-.ev-take {font-size: 1.12rem; font-weight: 650; text-align: center; margin: .6rem 0 .2rem 0;}
+.ev-model {font-size: 1.1rem; font-weight: 600; margin-bottom: .2rem;}
+.ev-take {font-size: 1.12rem; font-weight: 600; text-align: center; margin: .6rem 0 .2rem 0;}
 .ev-pending {border: 1px dashed rgba(128,128,128,.6); border-radius: 12px; padding: 18px; text-align: center;
              opacity: .8;}
 </style>
@@ -46,7 +47,7 @@ def _load(name):
 
 def _chip(text, color, tip=None):
     t = f" title='{html.escape(tip, quote=True)}'" if tip else ""
-    return f"<span class='ev-chip' style='background:{color}'{t}>{html.escape(text)}</span>"
+    return f"<span class='ev-chip' style='color:{color}; background:{color}1a'{t}>{html.escape(text)}</span>"
 
 
 def _show(fig, key):
@@ -94,13 +95,12 @@ def _km(x):
     return f"{x:,.0f} km" if x >= 10 else f"{x:.2g} km"
 
 
-def section_orbit():
+def section_orbit(n):
+    """Returns False (and draws nothing) when the orbit case has not been built."""
     data = _load("orbit.json")
-    ui.section(1, "Same data, two laws", "a real failure, made visible")
     if not data:
-        st.markdown("<div class='ev-pending'>Orbit case not built yet: "
-                    "<code>python demo/build_evidence.py orbit</code></div>", unsafe_allow_html=True)
-        return
+        return False
+    ui.section(n, "Same data, two laws", "a real failure, made visible")
     models = data["models"]
     wrong_key = "agent" if "agent" in models else "sindy"
     pair = [("truth", models["truth"]), (wrong_key, models[wrong_key])]
@@ -151,6 +151,7 @@ def section_orbit():
                    "the chart slices by distance from the centre for readability. The agent's law is shown with its "
                    "constants refitted on the training data (blinded units); a no-LLM degree-3 SINDy polynomial gives "
                    f"the verdict `{models.get('sindy', {}).get('verdict', {}).get('status', 'n/a')}`.")
+    return True
 
 
 @st.cache_data(show_spinner=False)
@@ -275,9 +276,9 @@ def rates_line(rates):
             f"<b>{clean['hit']}/{clean['n']}</b> false alarms; {caught}.")
 
 
-def section_grid():
+def section_grid(n):
     data = _load("grid.json")
-    ui.section(2, "Seven ways data goes wrong", "and what the checks say")
+    ui.section(n, "Seven ways data goes wrong", "and what the checks say")
     if not data:
         st.markdown("<div class='ev-pending'>Not built yet: <code>python demo/build_evidence.py grid</code></div>",
                     unsafe_allow_html=True)
@@ -326,9 +327,9 @@ def score_chart(counts, arms):
     return fig
 
 
-def section_scoreboard():
+def section_scoreboard(n):
     sb = _load("scoreboard.json")
-    ui.section(3, "Confidently wrong: before vs after", "the corruption benchmark")
+    ui.section(n, "Confidently wrong: before vs after", "the corruption benchmark")
     if not sb or not sb.get("available"):
         st.markdown("<div class='ev-pending'><b>Results pending.</b> The benchmark is running. Refresh with "
                     "<code>python demo/build_evidence.py scoreboard</code>.</div>", unsafe_allow_html=True)
@@ -392,11 +393,11 @@ def section_how():
 def page():
     st.html(CSS)
     ui.header("Knowing when not to trust the answer",
-              "Checks that stop an equation-discovery system from being confidently wrong")
+              "Checks that stop an equation-discovery system from being confidently wrong.", eyebrow="Trust")
     st.markdown(f"<div class='ev-principle'>{html.escape(PRINCIPLE)}</div>", unsafe_allow_html=True)
-    section_orbit()
-    section_grid()
-    section_scoreboard()
+    n = 2 if section_orbit(1) else 1
+    section_grid(n)
+    section_scoreboard(n + 1)
     section_how()
 
 

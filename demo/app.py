@@ -4,6 +4,8 @@ Three out-of-sample cases (one screen each) + a live "Run on your data" page. Re
 demo/examples/ (build with demo/build_showcase.py). Rehearsal mode (EQDISC_DEMO_FAKE=1 or the sidebar toggle)
 replays a scripted live run without API calls.
 """
+import base64
+import html
 import json
 import os
 import sys
@@ -20,7 +22,7 @@ for p in (str(REPO), str(DEMO)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-st.set_page_config(page_title="eqdisc — equations that forecast", page_icon="🧭", layout="wide",
+st.set_page_config(page_title="eqdisc — equations that forecast", page_icon=":material/function:", layout="wide",
                    initial_sidebar_state="expanded")
 
 import evidence  # noqa: E402
@@ -53,8 +55,7 @@ def tool_chips(tools, title="what the agent did (from its log)"):
     if counts:
         ui.chips([f"{k} ×{n}" if n > 1 else k for k, n in counts.items()], title=f"{title} · {len(tools)} tool calls")
 J2_ACCEPTED = 1.08263e-3
-PAGES = ["Home", "🛰️ LAGEOS-1 satellite", "🔥 Chaos (KS)", "🌀 Gray–Scott patterns", "⚡ Run on your data",
-         "⚙️ How it works", "🌍 Orbit with a big bulge", "🔎 When not to trust it"]
+PAGE = {}  # key -> st.Page, filled in main()
 
 
 @st.cache_data(show_spinner=False)
@@ -84,10 +85,6 @@ def hero_video(case):
 
 def km(x):
     return f"{x:,.0f} km" if x >= 10 else f"{x:.2g} km"
-
-
-def go_to(page):
-    st.session_state["nav"] = page
 
 
 def missing(case):
@@ -147,7 +144,8 @@ def page_lageos():
     n = lageos_numbers(info)
     ag = info.get("agent") or {}
     pe_ag = ag.get("position_error_km") or {}
-    ui.header("🛰️ A real satellite", "LAGEOS-1: one year of hourly positions in → its law of motion out → a month of forecast")
+    ui.header("A real satellite", "LAGEOS-1: one year of hourly positions in, its law of motion out, then a month of "
+              "forecast it never saw.", eyebrow="Real data · Case 1")
     ui.section(1, "What it found", "and how its forecast compares")
     left, right = st.columns([1.15, 1], gap="large")
     with left:
@@ -161,7 +159,7 @@ def page_lageos():
             st.caption("The law it found from six unnamed columns in random units (r² = u1² + u2² + u3²): "
                        "Newton's gravity plus Earth's equatorial bulge.")
             ui.tiles([
-                {"label": "Agent: 30-day error", "value": km(pe_ag["30d"]), "delta": f"1 day: {km(pe_ag['1d'])}",
+                {"label": "Agent: 30-day error", "value": km(pe_ag["30d"]), "delta": f"1 day: {km(pe_ag['1d'])}", "hi": ok,
                  "help": "Position error after 30 days of forecasting from the last training state."},
                 {"label": "Neural net (MLP)", "value": km(n["N"]), "delta": "same data"},
                 {"label": "Round-Earth gravity", "value": km(n["K"]), "delta": "textbook ellipse (Kepler)"},
@@ -241,7 +239,8 @@ def page_orbit():
     pe = r["position_error_km"]
     ag = info.get("agent") or {}
     pa = pe.get("data-only agent")
-    ui.header("🌍 A planet with a huge bulge", "Synthetic satellite: 3 noisy days in → law → next 3 days. An honest failure.")
+    ui.header("A planet with a huge bulge", "A synthetic satellite: 3 noisy days in, a law out, then the next 3 days. "
+              "It does not find the law, and its own checks say so.", eyebrow="Synthetic · An honest failure")
     ui.section(1, "What it found", "and how its forecast compares")
     left, right = st.columns([1.15, 1], gap="large")
     with left:
@@ -259,7 +258,8 @@ def page_orbit():
                             f"(a polynomial in distances and speeds)</b>, with {n_c} constants.<br>"
                             "Missing: <b>Newton's 1/r² pull</b> and the bulge term.</div>", unsafe_allow_html=True)
             ui.tiles([
-                {"label": "eqdisc: error after 1 day", "value": km(pa["24h"]), "delta": f"after 3 days: {km(pa['72h'])}"},
+                {"label": "eqdisc: error after 1 day", "value": km(pa["24h"]), "delta": f"after 3 days: {km(pa['72h'])}",
+                 "hi": ok},
                 {"label": "Neural network", "value": km(pe["neural step model (MLP)"]["24h"]), "delta": "after 1 day"},
                 {"label": "Round-Earth gravity", "value": km(pe["Kepler"]["24h"]), "delta": "after 1 day"},
                 {"label": "True law (best possible)", "value": km(pe["Kepler + J2"]["24h"]), "delta": "after 1 day"},
@@ -268,7 +268,7 @@ def page_orbit():
         else:
             ui.verdict_chip("PENDING", "data-only agent run in progress")
         if pa and not ok:
-            st.markdown("<div class='small'><b>Why it failed.</b> The agent found the kinematics and the rotational "
+            st.markdown("<div class='small' style='margin-top:1rem'><b>Why it failed.</b> The agent found the kinematics and the rotational "
                         "symmetry (conserved L<sub>z</sub>) but fitted a polynomial in r², z², v² instead of inverse-"
                         "square gravity plus a bulge term, and submitted it. The confidence checks below (run "
                         "afterwards, on the training data only) catch it: they flag a missing inverse-square pull and "
@@ -350,7 +350,8 @@ def page_ks():
         rows.append({"term": c["term"], "truth": tv, "refit": c["refit"], "90% CI": c["ci90"],
                      "inside": tv is not None and c["ci90"][0] <= tv <= c["ci90"][1]})
     n_in = sum(x["inside"] for x in rows)
-    ui.header("🔥 Chaos", "A blinded chaotic PDE with 2% noise: how long can the found equation forecast?")
+    ui.header("Chaos", "A blinded chaotic PDE with 2% noise. How long can the equation it finds forecast?",
+              eyebrow="Blinded PDE · Case 2")
     ui.section(1, "What it found", "and how long the forecast stays useful")
     left, right = st.columns([1.15, 1], gap="large")
     with left:
@@ -366,7 +367,7 @@ def page_ks():
                                                  if x["truth"] is not None))
         ui.tiles([
             {"label": "Agent forecast", "value": f"{vt['eqdisc agent (refit)']:.2f} λ",
-             "delta": f"true PDE {vt['true PDE from noisy state']:.2f}",
+             "delta": f"true PDE {vt['true PDE from noisy state']:.2f}", "hi": True,
              "help": "Lyapunov times until relative error exceeds 0.5. The true PDE itself cannot do better from a noisy state."},
             {"label": "FNO forecast", "value": f"{vt['FNO (same noisy data)']:.2f} λ", "delta": "same noisy data",
              "help": "Fourier neural operator trained on the same noisy window. λ = Lyapunov times."},
@@ -413,7 +414,8 @@ def page_gs():
     res = info.get("results")
     vr = (res or {}).get("vrmse") or {}
     agent = (res or {}).get("agent")
-    ui.header("🌀 Patterns", "Gray–Scott reaction–diffusion (The Well): two noisy movies in → equation → forecast a new run")
+    ui.header("Patterns", "Gray–Scott reaction–diffusion from The Well: two noisy movies in, an equation out, then a "
+              "forecast of a run it never saw.", eyebrow="Benchmark data · Case 3")
     ui.section(1, "What it found", "and where each forecast goes wrong")
     left, right = st.columns([1.15, 1], gap="large")
     with left:
@@ -436,7 +438,8 @@ def page_gs():
             for lab in (best, "FNO (same noisy data)", "true PDE from noisy frame"):
                 if lab in vr:
                     t.append({"label": f"{SHORT.get(lab, lab)} VRMSE", "value": f"{vr[lab]['6-12']:.3g}",
-                              "delta": f"steps 13–30: {vr[lab]['13-30']:.3g}", "help": f"{lab}; rollout steps 6–12"})
+                              "delta": f"steps 13–30: {vr[lab]['13-30']:.3g}", "help": f"{lab}; rollout steps 6–12",
+                              "hi": lab == best})
             t.append({"label": "Well paper best", "value": "0.29", "delta": "steps 13–30: 7.62",
                       "help": "CNextU-net in The Well paper, trained on hundreds of trajectories"})
             ui.tiles(t[:4])
@@ -495,63 +498,86 @@ def page_gs():
 
 
 # ============================================================================= home
+def _thumb_html(case):
+    th = SHOW / case / "thumb.jpg"
+    if not th.exists():
+        return ""
+    return f"<img class='home-thumb' src='data:image/jpeg;base64,{base64.b64encode(th.read_bytes()).decode()}'>"
+
+
+HOME_CSS = """<style>
+.home-thumb {width: 100%; aspect-ratio: 16 / 8; object-fit: cover; object-position: center 60%; border-radius: 8px;
+             display: block; background: #f3f3f1;}
+</style>"""
+
+
+def home_card(tag, name, num, sub, case, page):
+    with st.container(border=True):
+        st.markdown(f"{_thumb_html(case)}<div class='card-tag'>{tag}</div><div class='card-name'>{name}</div>"
+                    f"<div class='card-num'>{num}</div><div class='card-sub'>{sub}</div>", unsafe_allow_html=True)
+        st.page_link(PAGE[page], label="Open case", icon=":material/arrow_forward:")
+
+
 def page_home():
-    st.markdown("# eqdisc: equations that forecast")
-    st.markdown("Give it measurements; Claude agents return the governing equation, how sure they are, and what to "
-                "measure next.")
-    st.markdown(f"<div class='protocol'>✅ {PROTOCOL}</div>", unsafe_allow_html=True)
+    st.html(HOME_CSS)
+    ui.header("Equations that forecast", "Give it measurements. Claude agents return the governing equation, how sure "
+              "they are, and what to measure next.", eyebrow="eqdisc")
+    st.markdown(f"<div class='protocol'>{PROTOCOL}</div>", unsafe_allow_html=True)
     cards = []
     info, _ = load_case("lageos")
     if info:
         n = lageos_numbers(info)
         pe_ag = (info.get("agent") or {}).get("position_error_km")
         if pe_ag:
-            cards.append(("🛰️ LAGEOS-1 satellite (real)", f"{km(pe_ag['30d'])} vs {km(n['N'])}",
-                          "30-day forecast error: data-only agent vs neural net", "lageos", PAGES[1]))
+            cards.append(("Real data", "LAGEOS-1 satellite", f"{km(pe_ag['30d'])} <span>vs {km(n['N'])}</span>",
+                          "30-day forecast error: data-only agent vs neural net", "lageos", "lageos"))
         else:
-            cards.append(("🛰️ LAGEOS-1 satellite (real)", "agent pending",
-                          f"30-day error: Kepler {km(n['K'])}, neural net {km(n['N'])}", "lageos", PAGES[1]))
-    info, _ = load_case("orbit")
-    if info and (info["results"]["position_error_km"].get("data-only agent")):
-        pe = info["results"]["position_error_km"]
-        ag_, nn_ = pe['data-only agent']['24h'], pe['neural step model (MLP)']['24h']
-        if ag_ < nn_:
-            cards.append(("🌍 Orbit with a big bulge (synthetic)", f"{km(ag_)} vs {km(nn_)}",
-                          "1-day forecast error: data-only agent vs neural net", "orbit", PAGES[6]))
-        else:
-            cards.append(("🌍 Orbit with a big bulge (synthetic)", "✗ not recovered",
-                          f"an honest failure: after 1 day the agent is {km(ag_)} off, the neural net {km(nn_)}",
-                          "orbit", PAGES[6]))
+            cards.append(("Real data", "LAGEOS-1 satellite", "<span>agent pending</span>",
+                          f"30-day error: Kepler {km(n['K'])}, neural net {km(n['N'])}", "lageos", "lageos"))
     info, _ = load_case("ks")
     if info:
         vt = info["results"]["valid_time_lyapunov"]
-        cards.append(("🔥 Chaos, blinded (KS)",
-                      f"{vt['eqdisc agent (refit)']:.1f} vs {vt['FNO (same noisy data)']:.1f}",
-                      "Lyapunov times forecast: agent vs FNO", "ks", PAGES[2]))
+        cards.append(("Blinded PDE", "Chaos",
+                      f"{vt['eqdisc agent (refit)']:.1f} λ <span>vs {vt['FNO (same noisy data)']:.1f} λ</span>",
+                      "Lyapunov times of useful forecast: agent vs neural operator", "ks", "ks"))
     info, _ = load_case("gray_scott")
     if info:
         vr = (info.get("results") or {}).get("vrmse") or {}
         lab = "eqdisc agent (refit)"
         if lab in vr:
-            num, sub = f"{vr[lab]['6-12']:.2g}", "rollout VRMSE (steps 6–12); The Well paper's best: 0.29"
+            num, sub = f"{vr[lab]['6-12']:.2g} <span>vs 0.29</span>", "rollout error (VRMSE, steps 6–12): agent vs " \
+                "The Well paper's best neural surrogate"
         else:
-            num = "agent pending"
             fno = vr.get("FNO (same noisy data)")
+            num = "<span>agent pending</span>"
             sub = (f"VRMSE 6–12: FNO on same data {fno['6-12']:.2g}; The Well paper's best 0.29" if fno
                    else "forecast a held-out trajectory")
-        cards.append(("🌀 Gray–Scott (The Well)", num, sub, "gray_scott", PAGES[3]))
+        cards.append(("Benchmark data", "Patterns", num, sub, "gray_scott", "gray_scott"))
+    info, _ = load_case("orbit")
+    if info and (info["results"]["position_error_km"].get("data-only agent")):
+        pe = info["results"]["position_error_km"]
+        ag_, nn_ = pe['data-only agent']['24h'], pe['neural step model (MLP)']['24h']
+        if ag_ < nn_:
+            cards.append(("Synthetic", "Orbit with a big bulge", f"{km(ag_)} <span>vs {km(nn_)}</span>",
+                          "1-day forecast error: data-only agent vs neural net", "orbit", "orbit"))
+        else:
+            cards.append(("Synthetic · honest failure", "Orbit with a big bulge", "Not recovered",
+                          f"After 1 day the agent is {km(ag_)} off, the neural net {km(nn_)}. Its own checks "
+                          "refuse to call it confident.", "orbit", "orbit"))
+    for i in range(0, len(cards), 2):
+        cols = st.columns(2, gap="medium")
+        for c, card in zip(cols, cards[i:i + 2]):
+            with c:
+                home_card(*card)
     ev = evidence.home_card()
     if ev:
-        cards.append(("🔎 When not to trust it", ev[0], ev[1], "evidence", PAGES[7]))
-    cols = st.columns(len(cards) or 1, gap="medium")
-    for c, (name, num, sub, case, page) in zip(cols, cards):
-        with c, st.container(border=True):
-            th = SHOW / case / "thumb.jpg"
-            if th.exists():
-                st.image(str(th), width="stretch")
-            st.markdown(f"<div class='card-name'>{name}</div><div class='card-num'>{num}</div>"
-                        f"<div class='card-sub'>{sub}</div>", unsafe_allow_html=True)
-            st.button("Open →", key=f"open_{case}", on_click=go_to, args=(page,), width="stretch")
+        with st.container(border=True):
+            l, r = st.columns([3, 1], vertical_alignment="center")
+            l.markdown(f"<div class='card-tag' style='margin-top:0'>Trust</div><div class='card-name'>When not to trust "
+                       f"it</div><div class='card-num'>{html.escape(ev[0])}</div><div class='card-sub'>"
+                       f"{html.escape(ev[1])}</div>", unsafe_allow_html=True)
+            with r:
+                st.page_link(PAGE["evidence"], label="Open", icon=":material/arrow_forward:")
 
 
 # ============================================================================= live
@@ -652,7 +678,8 @@ def render_live_result(job):
 
 
 def page_live(fake):
-    ui.question("Run on your data")
+    ui.header("Run on your data", "Upload a CSV or pick an example. The agents return an equation, how sure they "
+              "are, and what to measure next.", eyebrow="Try it")
     job = st.session_state.get("job")
     running = job is not None and not job.done
     c1, c2 = st.columns([1.3, 1], gap="large")
@@ -682,9 +709,12 @@ def page_live(fake):
             num = list(df.select_dtypes("number").columns)
             target = st.selectbox("Target", num, index=len(num) - 1, disabled=running)
         budget = st.segmented_control("Budget", ["Quick", "Full"], default="Quick", disabled=running, key="budget") or "Quick"
-        go_btn = st.button("🚀 Discover", type="primary", disabled=running or df is None)
-    st.caption((f"{df.shape[0]} rows × {df.shape[1]} columns · {resolved}" if df is not None else "")
-               + (" · 🎭 rehearsal mode (no API calls)" if fake else ""))
+        go_btn = st.button("Discover", type="primary", icon=":material/arrow_forward:", disabled=running or df is None,
+                           help=None if df is not None else "Upload a CSV or pick an example first")
+    meta = ([f"{df.shape[0]} rows × {df.shape[1]} columns", resolved] if df is not None else []) \
+        + (["rehearsal mode (no API calls)"] if fake else [])
+    if meta:
+        st.caption(" · ".join(meta))
 
     if go_btn and df is not None:
         run_dir = live.RUNS / time.strftime("%Y%m%d-%H%M%S")
@@ -713,7 +743,7 @@ def page_live(fake):
         def paint():
             lines = [live.fmt_event(e).replace("$", "\\$") for e in job.events]
             logph.markdown("\n\n".join(lines[-40:]) or "_starting…_", unsafe_allow_html=True)
-            timer.caption(f"⏱️ {job.elapsed:.0f} s · {sum(e.get('type') == 'tool' for e in job.events)} tool calls")
+            timer.caption(f"{job.elapsed:.0f} s · {sum(e.get('type') == 'tool' for e in job.events)} tool calls")
         while not job.done:
             job.drain()
             paint()
@@ -732,7 +762,7 @@ def page_live(fake):
 
 # ============================================================================= how it works
 def page_how():
-    ui.question("How it works")
+    ui.header("How it works", "From raw numbers to a law, a verdict and the next experiment.", eyebrow="About")
     st.graphviz_chart("""
 digraph G { rankdir=LR; bgcolor="transparent"; node [shape=box, style="rounded,filled", fillcolor="#eef2ff",
   color="#6366f1", fontname="Helvetica", fontsize=11]; edge [color="#888888"];
@@ -741,11 +771,11 @@ digraph G { rankdir=LR; bgcolor="transparent"; node [shape=box, style="rounded,f
   T [label="tournament"]; A [label="red team", fillcolor="#fee2e2", color="#dc2626"];
   Q [label="assessment\\nCIs · ΔBIC · noise floor"]; V [label="verdict +\\nnext experiment", fillcolor="#dcfce7", color="#16a34a"];
   D->I->P->B->T->A->Q->V; }""")
-    st.markdown(f"<div class='protocol'>✅ {PROTOCOL}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='protocol'>{PROTOCOL}</div>", unsafe_allow_html=True)
     st.markdown("| verdict | meaning |\n|---|---|\n"
-                "| ✓ CONFIDENT | every term supported, error at the noise floor, predicts held-out data |\n"
-                "| ◐ COLLECT MORE DATA | competing models remain; it names the experiment that separates them |\n"
-                "| ? INCONCLUSIVE | the data cannot determine the model |")
+                "| Confident | every term supported, error at the noise floor, predicts held-out data |\n"
+                "| Collect more data | competing models remain; it names the experiment that separates them |\n"
+                "| Inconclusive | the data cannot determine the model |")
     with st.expander("Retracted / earlier experiments (not shown as results)"):
         st.markdown(
             "- **Domain leakage (retracted).** Earlier agent runs could see the dataset name, a one-line description "
@@ -762,13 +792,26 @@ digraph G { rankdir=LR; bgcolor="transparent"; node [shape=box, style="rounded,f
 # ============================================================================= main
 def main():
     env_fake = os.environ.get("EQDISC_DEMO_FAKE", "") not in ("", "0", "false")
+    fake = st.session_state.get("fake", env_fake)
+    PAGE.update(
+        home=st.Page(page_home, title="Overview", icon=":material/home:", url_path="overview", default=True),
+        lageos=st.Page(page_lageos, title="Real satellite", icon=":material/satellite_alt:", url_path="satellite"),
+        ks=st.Page(page_ks, title="Chaos", icon=":material/cyclone:", url_path="chaos"),
+        gray_scott=st.Page(page_gs, title="Patterns", icon=":material/texture:", url_path="patterns"),
+        orbit=st.Page(page_orbit, title="Big-bulge orbit", icon=":material/public:", url_path="big-bulge"),
+        evidence=st.Page(evidence.page, title="When not to trust it", icon=":material/shield:", url_path="trust"),
+        live=st.Page(lambda: page_live(fake), title="Run on your data", icon=":material/upload_file:",
+                     url_path="run"),
+        how=st.Page(page_how, title="How it works", icon=":material/account_tree:", url_path="how"),
+    )
+    nav = st.navigation({"": [PAGE["home"]],
+                         "Results": [PAGE["lageos"], PAGE["ks"], PAGE["gray_scott"], PAGE["orbit"]],
+                         "Trust": [PAGE["evidence"]],
+                         "Try it": [PAGE["live"], PAGE["how"]]})
     with st.sidebar:
-        st.markdown("### 🧭 eqdisc")
-        page = st.radio("Navigate", [PAGES[i] for i in (0, 1, 6, 7, 2, 3, 4, 5)], key="nav", label_visibility="collapsed")
-        with st.expander("⚙️", expanded=False):
-            fake = st.toggle("Rehearsal mode (no API calls)", value=env_fake, key="fake")
-    {"Home": page_home, PAGES[1]: page_lageos, PAGES[2]: page_ks, PAGES[3]: page_gs,
-     PAGES[5]: page_how, PAGES[6]: page_orbit, PAGES[7]: evidence.page}.get(page, lambda: page_live(fake))()
+        with st.expander("Settings", icon=":material/tune:"):
+            st.toggle("Rehearsal mode (no API calls)", value=env_fake, key="fake")
+    nav.run()
 
 
 main()

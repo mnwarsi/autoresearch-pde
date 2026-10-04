@@ -9,7 +9,7 @@ GREY = "rgba(120,120,120,0.85)"
 
 
 def _layout(fig, h=360, legend_top=False, **kw):
-    legend = dict(orientation="h", y=1.1, x=0) if legend_top else dict(orientation="h", y=-0.2, yanchor="top", x=0)
+    legend = dict(orientation="h", y=1.1, x=0) if legend_top else dict(orientation="h", y=-0.3, yanchor="top", x=0)
     kw.setdefault("hovermode", "x unified")
     fig.update_layout(height=h, margin=dict(l=10, r=10, t=30, b=10), legend=legend, **kw)
     return fig
